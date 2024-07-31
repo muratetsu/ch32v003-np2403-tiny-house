@@ -28,6 +28,8 @@
 
 ### Schematics
 
+![Schematics](schematics.png)
+
 ## Software
 
 ### Development Environment
