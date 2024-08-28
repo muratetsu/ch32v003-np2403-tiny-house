@@ -5,13 +5,18 @@
 //
 //
 // x 基板との接続はGND, 5V, SWDIOの3本
-//   GNDと5Vは電池端子のところに繋いでもよい
-//
 // x スイッチは押しっぱなしにするか，用意してあるスルーホールをジャンパーでつなぐ
 
 #include "debug.h"
 
 #define NUM_LEDS    8
+//#define NUM_LEDS    1
+
+// ADC value:
+// Button pressed:     519~
+// Button not pressed: 942~
+#define BUTTON_PRESS_THRESHOLD   ((519 + 942) / 2)
+
 
 void GPIO_Toggle_INIT(void)
 {
@@ -98,6 +103,55 @@ void TIM_PWMOut_Init(u16 arr, u16 psc, u16 ccp)
     TIM_Cmd(TIM2, ENABLE);
 }
 
+
+void ADC_Function_Init(void)
+{
+    ADC_InitTypeDef  ADC_InitStructure = {0};
+    GPIO_InitTypeDef GPIO_InitStructure = {0};
+
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_ADC1, ENABLE);
+    RCC_ADCCLKConfig(RCC_PCLK2_Div8);
+
+    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;
+    GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+    ADC_DeInit(ADC1);
+    ADC_InitStructure.ADC_Mode = ADC_Mode_Independent;
+    ADC_InitStructure.ADC_ScanConvMode = DISABLE;
+    ADC_InitStructure.ADC_ContinuousConvMode = DISABLE;
+    ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_None;
+    ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
+    ADC_InitStructure.ADC_NbrOfChannel = 1;
+    ADC_Init(ADC1, &ADC_InitStructure);
+
+    ADC_RegularChannelConfig(ADC1, ADC_Channel_0, 1, ADC_SampleTime_241Cycles);
+
+    ADC_Calibration_Vol(ADC1, ADC_CALVOL_50PERCENT);
+    ADC_ITConfig(ADC1, ADC_IT_AWD, ENABLE);
+    ADC_Cmd(ADC1, ENABLE);
+
+    ADC_ResetCalibration(ADC1);
+    while(ADC_GetResetCalibrationStatus(ADC1));
+    ADC_StartCalibration(ADC1);
+    while(ADC_GetCalibrationStatus(ADC1));
+}
+
+
+u16 Get_ADC_Val(u8 ch)
+{
+    u16 val;
+
+    ADC_SoftwareStartConvCmd(ADC1, ENABLE);
+
+    while(!ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC));
+
+    val = ADC_GetConversionValue(ADC1);
+
+    return val;
+}
+
+
 void setPwm(int num, int val)
 {
     switch (num) {
@@ -153,14 +207,28 @@ int main(void)
     GPIO_WriteBit(GPIOC, GPIO_Pin_1, Bit_SET);  // Enable DCDC
 
     TIM_PWMOut_Init(255, 250 - 1, 0);  // 8MHz / 250 / 256 = 125Hz
+    ADC_Function_Init();
 
     Delay_Ms(1000);
+
+    uint8_t buttonPressed;
+    if (Get_ADC_Val(ADC_Channel_0) < BUTTON_PRESS_THRESHOLD){
+        buttonPressed = 1;
+    }
+    else {
+        buttonPressed = 0;
+    }
 
     for (int n = 0; n < NUM_LEDS; n++) {
         fadein(n);
     }
 
-    Delay_Ms(5000);
+    if (buttonPressed) {
+        Delay_Ms(60000);
+    }
+    else {
+        Delay_Ms(2000);
+    }
 
     for (int n = 0; n < NUM_LEDS; n++) {
         fadeout(n);
