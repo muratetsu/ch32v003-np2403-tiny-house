@@ -7,15 +7,24 @@
 // x 基板との接続はGND, 5V, SWDIOの3本
 // x スイッチは押しっぱなしにするか，用意してあるスルーホールをジャンパーでつなぐ
 
+#include <stdlib.h>
+#include <stdbool.h>
 #include "debug.h"
 
-#define NUM_LEDS    8
 //#define NUM_LEDS    1
+#define NUM_LEDS    4
+//#define NUM_LEDS    8
 
 // ADC value:
 // Button pressed:     519~
 // Button not pressed: 942~
 #define BUTTON_PRESS_THRESHOLD   ((519 + 942) / 2)
+
+
+typedef enum {
+  FADEIN,
+  FADEOUT
+} fadeMode_t;
 
 
 void GPIO_Toggle_INIT(void)
@@ -152,6 +161,16 @@ u16 Get_ADC_Val(u8 ch)
 }
 
 
+void powerEnbale(bool enable)
+{
+    if (enable) {
+        GPIO_WriteBit(GPIOC, GPIO_Pin_1, Bit_SET);      // Enable DCDC
+    }
+    else {
+        GPIO_WriteBit(GPIOC, GPIO_Pin_1, Bit_RESET);    // Disable DCDC
+    }
+}
+
 void setPwm(int num, int val)
 {
     switch (num) {
@@ -198,18 +217,62 @@ void fadeout(int num)
     }
 }
 
+void setRandomSeed(void)
+{
+    unsigned long seed;
+
+    for (int n = 0; n < 4; n++) {
+        seed <<= 8;
+        seed |= Get_ADC_Val(ADC_Channel_0) & 0xff;
+        // Wait a while to get a different value from previous one
+        Delay_Ms(10);
+    }
+
+    srand(seed);
+}
+
+void selectRandom(fadeMode_t mode)
+{
+    int state = 0;
+
+    for (;;) {
+        int num = rand() % NUM_LEDS;
+        int bitMask = 1 << num;
+
+        if ((state & bitMask) == 0) {
+            if (mode == FADEIN) {
+                fadein(num);
+            }
+            else {
+                fadeout(num);
+            }
+            state |= bitMask;
+
+            // If all bits are set
+            if (state >= (1 << NUM_LEDS) - 1) {
+                break;
+            }
+        }
+        else {
+            Delay_Ms(500);
+        }
+    }
+}
+
 int main(void)
 {
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
     SystemCoreClockUpdate();
     Delay_Init();
     GPIO_Toggle_INIT();
-    GPIO_WriteBit(GPIOC, GPIO_Pin_1, Bit_SET);  // Enable DCDC
+    powerEnbale(true);
 
     TIM_PWMOut_Init(255, 250 - 1, 0);  // 8MHz / 250 / 256 = 125Hz
     ADC_Function_Init();
 
     Delay_Ms(1000);
+
+    setRandomSeed();
 
     uint8_t buttonPressed;
     if (Get_ADC_Val(ADC_Channel_0) < BUTTON_PRESS_THRESHOLD){
@@ -219,9 +282,7 @@ int main(void)
         buttonPressed = 0;
     }
 
-    for (int n = 0; n < NUM_LEDS; n++) {
-        fadein(n);
-    }
+    selectRandom(FADEIN);
 
     if (buttonPressed) {
         Delay_Ms(60000);
@@ -230,12 +291,10 @@ int main(void)
         Delay_Ms(2000);
     }
 
-    for (int n = 0; n < NUM_LEDS; n++) {
-        fadeout(n);
-    }
+    selectRandom(FADEOUT);
 
     Delay_Ms(1000);
-    GPIO_WriteBit(GPIOC, GPIO_Pin_1, Bit_RESET);    // Disable DCDC
+    powerEnbale(false);
 
     while(1) {
     }
