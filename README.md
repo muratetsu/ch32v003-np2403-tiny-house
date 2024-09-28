@@ -2,6 +2,8 @@
 
 "小さなお家" の各LEDをランダムに順次点灯し，一定時間後に順次消灯する制御ソフトウェア．
 
+![Device Image](device_image.jpg)
+
 ## Hardware
 
 ### Features
