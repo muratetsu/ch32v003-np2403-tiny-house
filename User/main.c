@@ -93,11 +93,15 @@ bool selectRandom(fadeMode_t mode)
     case TOGGLE:
         if ((state & bitMask) == 0) {
             fadein(num);
+            state ^= bitMask;
         }
         else {
-            fadeout(num);
+            // Avoid all LEDs to be cleared
+            if ((state ^ bitMask) != 0) {
+                fadeout(num);
+                state ^= bitMask;
+            }
         }
-        state ^= bitMask;
         break;
     }
 
@@ -123,10 +127,10 @@ int main(void)
 
     // Check button status
     if (buttonPressed()) {
-        // Toggle LEDs (30 x 10s = 5min)
-        for (int n = 0; n < 30; n++) {
+        // Toggle LEDs (50 x 6s = 5min)
+        for (int n = 0; n < 50; n++) {
             selectRandom(TOGGLE);
-            Delay_Ms(10000);
+            Delay_Ms(6000);
         }
 
         // Fade out LEDs
