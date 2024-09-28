@@ -24,7 +24,8 @@
 
 typedef enum {
   FADEIN,
-  FADEOUT
+  FADEOUT,
+  TOGGLE
 } fadeMode_t;
 
 
@@ -58,61 +59,94 @@ void setRandomSeed(void)
     srand(seed);
 }
 
-void selectRandom(fadeMode_t mode)
+bool selectRandom(fadeMode_t mode)
 {
-    int state = 0;
+    static int state = 0;
+    bool ret = false;
 
-    for (;;) {
-        int num = rand() % NUM_LEDS;
-        int bitMask = 1 << num;
+    int num = rand() % NUM_LEDS;
+    int bitMask = 1 << num;
 
+    switch (mode) {
+    case FADEIN:
         if ((state & bitMask) == 0) {
-            if (mode == FADEIN) {
-                fadein(num);
-            }
-            else {
-                fadeout(num);
-            }
-            state |= bitMask;
-
+            fadein(num);
+            state ^= bitMask;
             // If all bits are set
             if (state >= (1 << NUM_LEDS) - 1) {
-                break;
+                ret = true;
             }
         }
-        else {
-            Delay_Ms(500);
+        break;
+
+    case FADEOUT:
+        if ((state & bitMask) != 0) {
+            fadeout(num);
+            state ^= bitMask;
+            // If all bits are cleared
+            if (state == 0) {
+                ret = true;
+            }
         }
+        break;
+
+    case TOGGLE:
+        if ((state & bitMask) == 0) {
+            fadein(num);
+        }
+        else {
+            fadeout(num);
+        }
+        state ^= bitMask;
+        break;
     }
+
+    return ret;
 }
 
+bool buttonPressed(void)
+{
+    if (Get_ADC_Val(ADC_Channel_0) < BUTTON_PRESS_THRESHOLD){
+        return true;
+    }
+    else {
+        return false;
+    }
+}
 
 int main(void)
 {
     systemInit();
     powerEnbale(true);
     Delay_Ms(1000);
-
     setRandomSeed();
 
-    uint8_t buttonPressed;
-    if (Get_ADC_Val(ADC_Channel_0) < BUTTON_PRESS_THRESHOLD){
-        buttonPressed = 1;
+    // Check button status
+    if (buttonPressed()) {
+        // Toggle LEDs (30 x 10s = 5min)
+        for (int n = 0; n < 30; n++) {
+            selectRandom(TOGGLE);
+            Delay_Ms(10000);
+        }
+
+        // Fade out LEDs
+        while (selectRandom(FADEOUT) == false) {
+            Delay_Ms(500);
+        }
     }
     else {
-        buttonPressed = 0;
-    }
+        // Fade in LEDs
+        while (selectRandom(FADEIN) == false) {
+            Delay_Ms(500);
+        }
 
-    selectRandom(FADEIN);
-
-    if (buttonPressed) {
-        Delay_Ms(60000);
-    }
-    else {
         Delay_Ms(2000);
-    }
 
-    selectRandom(FADEOUT);
+        // Fade out LEDs
+        while (selectRandom(FADEOUT) == false) {
+            Delay_Ms(500);
+        }
+    }
 
     Delay_Ms(1000);
     powerEnbale(false);
