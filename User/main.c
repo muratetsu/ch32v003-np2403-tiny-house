@@ -33,7 +33,7 @@ void fadein(int num)
 {
     for (int n = 0; n < 256; n++) {
         setPwm(num, n);
-        Delay_Ms(6);
+        Delay_Ms(8);
     }
 }
 
@@ -126,30 +126,28 @@ int main(void)
     setRandomSeed();
 
     // Check button status
-    if (buttonPressed()) {
-        // Toggle LEDs (50 x 6s = 5min)
+    bool btnPressed = buttonPressed();
+
+    // Fade in LEDs
+    while (selectRandom(FADEIN) == false) {
+        Delay_Ms(500);
+    }
+
+    if (btnPressed) {
+        // Toggle LEDs (50 x 6s(avg) = 5min(appx))
         for (int n = 0; n < 50; n++) {
             selectRandom(TOGGLE);
-            Delay_Ms(6000);
-        }
-
-        // Fade out LEDs
-        while (selectRandom(FADEOUT) == false) {
-            Delay_Ms(500);
+            uint32_t delay = rand() % 12000;    // random delay from 0 to 12s
+            Delay_Ms(delay);
         }
     }
     else {
-        // Fade in LEDs
-        while (selectRandom(FADEIN) == false) {
-            Delay_Ms(500);
-        }
-
         Delay_Ms(2000);
+    }
 
-        // Fade out LEDs
-        while (selectRandom(FADEOUT) == false) {
-            Delay_Ms(500);
-        }
+    // Fade out LEDs
+    while (selectRandom(FADEOUT) == false) {
+        Delay_Ms(500);
     }
 
     Delay_Ms(1000);
