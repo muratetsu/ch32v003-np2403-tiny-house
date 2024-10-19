@@ -8,7 +8,7 @@
 
 ### Features
 
-- WCH CH32V003 RISC-V MCU
+- WCH CH32V003F4P6(TSSOP20) RISC-V MCU
 - Maximum eight LEDs
 - DC/DC enable control
 - Button press detection
